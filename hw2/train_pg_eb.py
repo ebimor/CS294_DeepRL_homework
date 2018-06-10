@@ -251,8 +251,7 @@ def train_PG(exp_name='',
     sess.__enter__() # equivalent to `with sess:`
     tf.global_variables_initializer().run() #pylint: disable=E1101
 
-    print("sy_logits_na.shape is: ", sy_logits_na.shape)
-    print("sy_nac.shape is: ", sy_nac.shape)
+
 
     #========================================================================================#
     # Training Loop
@@ -300,9 +299,6 @@ def train_PG(exp_name='',
         # across paths
         ob_no = np.concatenate([path["observation"] for path in paths])
         ac_nac = np.concatenate([path["action"] for path in paths])
-
-        print("obs shape is: ", ob_no.shape)
-        print("ac shape is: ", ac_nac.shape)
 
         #====================================================================================#
         #                           ----------SECTION 4----------
@@ -461,7 +457,6 @@ def train_PG(exp_name='',
         # and after an update, and then log them below.
 
         # YOUR_CODE_HERE
-        print(sy_logits_na.shape)
         sess.run(update_op, feed_dict={sy_ob_no : ob_no, sy_nac : ac_nac, sy_adv_n : adv_n})
 
         # Log diagnostics

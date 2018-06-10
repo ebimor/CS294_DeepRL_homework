@@ -180,7 +180,7 @@ def train_PG(exp_name='',
         sy_sampled_ac =  tf.multinomial(sy_logits_na, 1) # Hint: Use the tf.multinomial op
         sy_sampled_ac=tf.reshape(sy_sampled_ac,[-1])
 
-        sy_logprob_n = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=sy_ac_na, logits=sy_logits_na) #function of sy_logits_na and sy_ac_na
+        sy_logprob_n = -tf.nn.sparse_softmax_cross_entropy_with_logits(labels=sy_ac_na, logits=sy_logits_na) #function of sy_logits_na and sy_ac_na
 
     else:
         # YOUR_CODE_HERE
@@ -188,13 +188,11 @@ def train_PG(exp_name='',
         sy_logstd = tf.Variable(tf.zeros([1,ac_dim]), name="logstd", dtype='float', trainable=True) # logstd should just be a trainable variable, not a network output.
         sy_std = tf.exp(sy_logstd)
 
-        z = tf.random_normal(tf.constant([ac_dim,1]))
-        sy_sampled_ac=tf.matmul(sy_std, z)+sy_mean
-        sy_sampled_ac=tf.reshape(sy_sampled_ac,[-1])
+        sy_z = tf.random_normal(tf.constant([ac_dim,1]))
+        sy_sampled_ac=tf.matmul(sy_std, sy_z)+sy_mean
 
-        sqrt_sigma= tf.diag(sy_logstd)
-        z =  tf.matmul(sy_mean-sy_ac_na, sqrt_sigma) # Hint: Use the log probability under a multivariate gaussian
-        sy_logprob_n = 0.5*tf.norm(z)
+        z =  (sy_ac_na-sy_mean)/sy_std # Hint: Use the log probability under a multivariate gaussian
+        sy_logprob_n = -0.5*tf.reduce_mean(tf.square(z),axis=1)
 
 
     #========================================================================================#
@@ -202,7 +200,7 @@ def train_PG(exp_name='',
     # Loss Function and Training Operation
     #========================================================================================#
 
-    loss = tf.reduce_mean(sy_logprob_n*sy_adv_n) # Loss function that we'll differentiate to get the policy gradient.
+    loss = -tf.reduce_mean(sy_logprob_n*sy_adv_n) # Loss function that we'll differentiate to get the policy gradient.
     update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
     #gradients=loss.gradients(loss, variables)
@@ -224,7 +222,9 @@ def train_PG(exp_name='',
         # Define placeholders for targets, a loss function and an update op for fitting a
         # neural network baseline. These will be used to fit the neural network baseline.
         # YOUR_CODE_HERE
-        baseline_update_op = TODO
+        sy_value=tf.placeholder(shape=[None], name="value", dtype=tf.float32)
+        baseline_loss=tf.square(sy_value-baseline_prediction)
+        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
 
 
     #========================================================================================#
@@ -254,7 +254,7 @@ def train_PG(exp_name='',
         while True:
             ob = env.reset()
             obs, acs, rewards = [], [], []
-            animate_this_episode=(len(paths)==0 and (itr % 20 == 0) and animate)
+            animate_this_episode=(len(paths)==0 and (itr % 100 == 0) and animate)
             steps = 0
             while True:
                 if animate_this_episode:
@@ -283,6 +283,9 @@ def train_PG(exp_name='',
         ob_no = np.concatenate([path["observation"] for path in paths])
         ac_na = np.concatenate([path["action"] for path in paths])
 
+        r_n=np.concatenate([path["reward"] for path in paths])
+
+        print("ob_no shape is: ", ac_na.shape)
         #====================================================================================#
         #                           ----------SECTION 4----------
         # Computing Q-values
@@ -370,7 +373,6 @@ def train_PG(exp_name='',
 
         #print("q_n.shape is:", q_n.shape)
         #print("ac_na.shape is", ac_na.shape)
-
         #====================================================================================#
         #                           ----------SECTION 5----------
         # Computing Baselines
@@ -384,8 +386,9 @@ def train_PG(exp_name='',
             # Hint #bl1: rescale the output from the nn_baseline to match the statistics
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
+            b_n=sess.run(baseline_prediction, feed_dict={sy_ob_no: ob_no})
 
-            b_n = TODO
+            b_n=np.std(q_n)*(b_n-np.mean(b_n)+np.mean(q_n))/(1e-6+np.std(b_n))
             adv_n = q_n - b_n
         else:
             adv_n = q_n.copy()
@@ -399,9 +402,7 @@ def train_PG(exp_name='',
             # On the next line, implement a trick which is known empirically to reduce variance
             # in policy gradient methods: normalize adv_n to have mean zero and std=1.
             # YOUR_CODE_HERE
-            adv_M=np.mean(adv_n)
-            adv_sigma=np.mean(adv_n)
-            adv_n=(adv_n-adv_M)/(adv_sigma+1e-6)
+            adv_n=(adv_n-np.mean(adv_n))/(np.std(adv_n)+1e-8)
 
 
         #====================================================================================#
@@ -420,8 +421,10 @@ def train_PG(exp_name='',
             # targets to have mean zero and std=1. (Goes with Hint #bl1 above.)
 
             # YOUR_CODE_HERE
-            pass
+            target=r_n+gamma*b_n
 
+            target=(target-np.mean(target))/(np.std(target)+1e-8)
+            sess.run(baseline_update_op, feed_dict={sy_ob_no: ob_no, sy_value: target})
         #====================================================================================#
         #                           ----------SECTION 4----------
         # Performing the Policy Update
@@ -438,9 +441,9 @@ def train_PG(exp_name='',
 
 
         # YOUR_CODE_HERE
-        logz.log_tabular("preOptCost", sess.run(loss, feed_dict={sy_ob_no : ob_no, sy_ac_na: ac_na, sy_adv_n: adv_n}))
+        #logz.log_tabular("preOptCost", sess.run(loss, feed_dict={sy_ob_no : ob_no, sy_ac_na: ac_na, sy_adv_n: adv_n}))
         sess.run(update_op, feed_dict={sy_ob_no : ob_no, sy_ac_na: ac_na, sy_adv_n: adv_n })
-        logz.log_tabular("postOptCost", sess.run(loss, feed_dict={sy_ob_no : ob_no, sy_ac_na: ac_na, sy_adv_n: adv_n}))
+        logz.log_tabular("OptCost", sess.run(loss, feed_dict={sy_ob_no : ob_no, sy_ac_na: ac_na, sy_adv_n: adv_n}))
 
         #weighted_negative_likelihoods = tf.multiply(sy_logprob_n, q_n)
         #loss_G = tf.reduce_mean(weighted_negative_likelihoods)

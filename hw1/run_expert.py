@@ -31,8 +31,9 @@ class policy:
         self.env = gym.make(envname)
         self.state_len, self.action_len = env_dims(self.env)
         self.model = Sequential()
-        self.model.add(Dense(units=32, input_dim=self.state_len, kernel_initializer='normal', activation='relu'))
-        self.model.add(Dense(units=16, kernel_initializer='normal', activation='relu'))
+        self.model.add(Dense(units=128, input_dim=self.state_len, kernel_initializer='normal', activation='relu'))
+        self.model.add(Dense(units=64, kernel_initializer='normal', activation='relu'))
+        self.model.add(Dense(units=32, kernel_initializer='normal', activation='relu'))
         self.model.add(Dense(units=self.action_len, kernel_initializer='normal'))
 
         self.model.compile(loss='mean_squared_error', optimizer='adam')
@@ -44,7 +45,7 @@ class policy:
             print("Loading previously trained model")
             self.model = load_model('partly_trained.h5')
 
-        self.model.fit(X, Y, epochs=epchs, batch_size=bch_size,  verbose=1, validation_split=0.3)
+        self.model.fit(X, Y, epochs=epchs, batch_size=bch_size,  verbose=1, validation_split=0.02)
         self.trainedBefore=1;
         self.model.save('partly_trained.h5')
         del self.model
@@ -81,7 +82,7 @@ class policy:
                 if steps % 100 == 0: print("%i/%i"%(steps, max_steps))
                 if steps >= max_steps:
                     break
-            print("total reward is ", totalr)
+            #print("total reward is ", totalr)
         return observations, actions, totalr
 
     def labelData(self, observations):
@@ -125,27 +126,36 @@ def main():
     if args.simulate==0:  #cloning
         R=0
         CB=policy(args.envname)
-        observations, actions= simulate_expert(args.envname,args.max_timesteps,50,0)
+        observations, actions= simulate_expert(args.envname,args.max_timesteps,10,0)
         CB.train(observations,actions,100,100)
         observations, actions, R = CB.evaluate(args.max_timesteps, 2, 0)
-        print("reward is: ", R)
+        print("Evaluation reward of CB is: ", R)
     elif args.simulate==1: #run dagger
         print("Running DAGGER Algorithm")
         R=0
         Dagger=policy(args.envname)  #initiate a learning model
-        observations, labeled_action= simulate_expert(args.envname,args.max_timesteps,50,0) #generate human data
+        observations, actions= simulate_expert(args.envname,args.max_timesteps,10,0) #generate human data
 
         # train on human data
-        Dagger.train(observations,labeled_action,100,100)
-        while R<3500:
+        Dagger.train(observations,actions,120,100)
+        while R<10000 and TrainingNum<200:
             #apply trained policy and save observation_space
-            observations, _, R = Dagger.evaluate(args.max_timesteps, 2, 0)
+            observationsSim, _, R = Dagger.evaluate(args.max_timesteps, 1, 0)
+            print("Dagger reward is: ",R)
 
             #label observations by human/expert
-            labeled_action=Dagger.labelData(observations)
+            labeled_action=Dagger.labelData(observationsSim)
+            print("number of labeled data is: ", labeled_action.shape)
+
+            #Concatenate data
+            actions=np.concatenate((actions,labeled_action))
+            observations=np.concatenate((observations,observationsSim))
+
+            print("new dataset dimentions is: ", observations.shape)
+            print("new dataset dimentions is: ", actions.shape)
 
             # train on labeled data
-            Dagger.train(observations,labeled_action,5,100)
+            Dagger.train(observations,actions,10,100)
 
             TrainingNum=TrainingNum+1
             print("TrainingNum is: ", TrainingNum)
@@ -199,6 +209,8 @@ def simulate_expert(envname, steps_, num_rollouts, render=1):
                     env.render()
                 if steps >= max_steps:
                     break
+            print("generating data iteration is: ", i)
+            print("reward of expert is: ", totalr)
         return observations, actions
 
 
