@@ -93,6 +93,7 @@ def train_PG(exp_name='',
     # Maximum length for episodes
     max_path_length = max_path_length or env.spec.max_episode_steps
 
+
     #========================================================================================#
     # Notes on notation:
     #
@@ -185,11 +186,11 @@ def train_PG(exp_name='',
     else:
         # YOUR_CODE_HERE
         sy_mean = build_mlp(sy_ob_no, ac_dim, "PG_C", n_layers=n_layers, size=size)
-        sy_logstd = tf.Variable(tf.zeros([1,ac_dim]), name="logstd", dtype='float', trainable=True) # logstd should just be a trainable variable, not a network output.
+        sy_logstd = tf.Variable(tf.zeros([1,ac_dim]), name="PG_C/logstd", dtype=tf.float32) # logstd should just be a trainable variable, not a network output.
         sy_std = tf.exp(sy_logstd)
 
         sy_z = tf.random_normal(tf.constant([ac_dim,1]))
-        sy_sampled_ac=tf.matmul(sy_std, sy_z)+sy_mean
+        sy_sampled_ac=sy_std*sy_z+sy_mean
 
         z =  (sy_ac_na-sy_mean)/sy_std # Hint: Use the log probability under a multivariate gaussian
         sy_logprob_n = -0.5*tf.reduce_mean(tf.square(z),axis=1)
@@ -213,18 +214,18 @@ def train_PG(exp_name='',
     #========================================================================================#
 
     if nn_baseline:
-        baseline_prediction = tf.squeeze(build_mlp(
+        value_prediction = tf.squeeze(build_mlp(
                                 sy_ob_no,
                                 1,
-                                "nn_baseline",
+                                "nn_value",
                                 n_layers=n_layers,
                                 size=size))
         # Define placeholders for targets, a loss function and an update op for fitting a
         # neural network baseline. These will be used to fit the neural network baseline.
         # YOUR_CODE_HERE
         sy_value=tf.placeholder(shape=[None], name="value", dtype=tf.float32)
-        baseline_loss=tf.square(sy_value-baseline_prediction)
-        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
+        value_pred_loss=tf.nn.l2_loss(sy_value-value_prediction)
+        value_pred_update_op = tf.train.AdamOptimizer(learning_rate).minimize(value_pred_loss)
 
 
     #========================================================================================#
@@ -285,7 +286,10 @@ def train_PG(exp_name='',
 
         r_n=np.concatenate([path["reward"] for path in paths])
 
-        print("ob_no shape is: ", ac_na.shape)
+
+
+        #print("ob_no shape is: ", ob_no.shape)
+        #print("r_n shape is: ", r_n.shape)
         #====================================================================================#
         #                           ----------SECTION 4----------
         # Computing Q-values
@@ -386,10 +390,33 @@ def train_PG(exp_name='',
             # Hint #bl1: rescale the output from the nn_baseline to match the statistics
             # (mean and std) of the current or previous batch of Q-values. (Goes with Hint
             # #bl2 below.)
-            b_n=sess.run(baseline_prediction, feed_dict={sy_ob_no: ob_no})
+            v_n=sess.run(value_prediction, feed_dict={sy_ob_no: ob_no})
+            v_norm=np.mean(q_n)+np.std(q_n)*(v_n-np.mean(v_n))/(np.std(v_n)+1e-8)
 
-            b_n=np.std(q_n)*(b_n-np.mean(b_n)+np.mean(q_n))/(1e-6+np.std(b_n))
-            adv_n = q_n - b_n
+
+            adv_n=[]
+            L=0
+            alpha=0.9
+
+            for path in paths:
+                adv=[]
+                idMAX=pathlength(path)
+                idx=idMAX-1
+                adv_p=0
+                for rew in reversed(path['reward']):  #start with the end of the path and add discounted rewards one by one
+
+                    if idx<idMAX-1:
+                        adv_p=rew+gamma*v_norm[L+idx+1]-v_norm[L+idx]+alpha*adv_p
+                    else:
+                        adv_p=rew-v_norm[L+idx]
+
+                    adv.append(adv_p)
+                    idx-=1
+                adv.reverse()
+                adv_n.extend(adv)
+                L+=idMAX  #we need to obtain the correct index in v_n
+            q_n= adv_n+v_norm
+
         else:
             adv_n = q_n.copy()
 
@@ -420,11 +447,11 @@ def train_PG(exp_name='',
             # Hint #bl2: Instead of trying to target raw Q-values directly, rescale the
             # targets to have mean zero and std=1. (Goes with Hint #bl1 above.)
 
-            # YOUR_CODE_HERE
-            target=r_n+gamma*b_n
 
-            target=(target-np.mean(target))/(np.std(target)+1e-8)
-            sess.run(baseline_update_op, feed_dict={sy_ob_no: ob_no, sy_value: target})
+            # YOUR_CODE_HERE
+            q_normalized_n = (q_n-np.mean(q_n))/(np.std(q_n)+1e-8)
+            #target=(target-np.mean(target))/(np.std(target)+1e-8)
+            sess.run(value_pred_update_op, feed_dict={sy_ob_no: ob_no, sy_value: q_normalized_n})
         #====================================================================================#
         #                           ----------SECTION 4----------
         # Performing the Policy Update
