@@ -285,17 +285,10 @@ def learn(env,
 
             obs_t_batch, act_batch, rew_batch, obs_tp1_batch, done_mask_batch=replay_buffer.sample(batch_size)
             if not model_initialized:
-                initialize_interdependent_variables(session, tf.global_variables(), {
-                    obs_t_ph: obs_t_batch,
-                    obs_tp1_ph: obs_tp1_batch,
-                    })
+                initialize_interdependent_variables(session, tf.global_variables(), {obs_t_ph: obs_t_batch,obs_tp1_ph: obs_tp1_batch,})
+                model_initialized=True
 
-                    model_initialized=True
-
-           session.run(train_fn, feed_dict={obs_t_ph:obs_t_batch, act_t_ph:act_batch,
-                                rew_batch: rew_batch, obs_tp1_ph: obs_tp1_batch,
-                                done_mask_ph: done_mask_ph,
-                                learning_rate: optimizer_spec.lr_schedule.value(t)})
+            session.run(train_fn, feed_dict={obs_t_ph:obs_t_batch, act_t_ph:act_batch, rew_batch: rew_batch, obs_tp1_ph: obs_tp1_batch, done_mask_ph: done_mask_ph,learning_rate: optimizer_spec.lr_schedule.value(t)})
 
             num_param_updates+=1
 
