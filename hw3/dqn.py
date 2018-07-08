@@ -210,6 +210,31 @@ def learn(env,
 
         # YOUR CODE HERE
 
+        idx=replay_buffer.store_frame(last_obs)
+
+        framed_obs=replay_buffer.encode_recent_observation()
+        ac=session.run(q_current, feed_dict={obs_t_ph:framed_obs}) #here ac includes the q_values of all possible actions in this #!/usr/bin/env python
+
+        #determine action based on epsilon greedy exploration given as the argument
+        eps=exploration.value(t)
+        prob=np.rand(1)
+        if prob<eps:
+            action=env.action_space[np.random.randint(0,num_actions)]
+        else:
+            action=env.action_space(np.argmax(ac))
+
+        last_obs, reward, done, info = env.step(action)
+        replay_buffer.store_effect(idx, action, reward, done)
+
+
+        if done is True:
+            last_obs=env.reset()
+
+
+
+
+
+
         #####
 
         # at this point, the environment should have been advanced one step (and
