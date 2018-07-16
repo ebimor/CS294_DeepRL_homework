@@ -202,7 +202,7 @@ def train_PG(exp_name='',
     #========================================================================================#
 
     loss = -tf.reduce_mean(sy_logprob_n*sy_adv_n) # Loss function that we'll differentiate to get the policy gradient.
-    update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    update_op = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-2).minimize(loss)
 
     #gradients=loss.gradients(loss, variables)
 
@@ -225,7 +225,7 @@ def train_PG(exp_name='',
         # YOUR_CODE_HERE
         sy_value=tf.placeholder(shape=[None], name="value", dtype=tf.float32)
         value_pred_loss=tf.nn.l2_loss(sy_value-value_prediction)
-        value_pred_update_op = tf.train.AdamOptimizer(learning_rate).minimize(value_pred_loss)
+        value_pred_update_op = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=1e-2).minimize(value_pred_loss)
 
 
     #========================================================================================#
@@ -255,7 +255,7 @@ def train_PG(exp_name='',
         while True:
             ob = env.reset()
             obs, acs, rewards = [], [], []
-            animate_this_episode=(len(paths)==0 and (itr % 100 == 0) and animate)
+            animate_this_episode=(len(paths)==0 and (itr % 110 == 0) and animate)
             steps = 0
             while True:
                 if animate_this_episode:

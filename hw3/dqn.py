@@ -130,14 +130,14 @@ def learn(env,
     # YOUR CODE HERE
 
     q_current=q_func(obs_t_float, num_actions, scope="q_current", reuse=False)
-    q_target=q_func(obs_t_float, num_actions, scope="q_target", reuse=False)
+    greedy_action=tf.reduce_max(q_current,axis=1)
 
-    if done_mask_ph.eval()==1:
-        y_j=rew_t_ph
-    else:
-        y_j=rew_t_ph+gamma*reduce_max(q_target,1) #assuming that each row co
+    q_target=q_func(obs_tp1_float, num_actions, scope="q_target", reuse=False)
 
-    total_error=reduce_sum(q_current-y_j)
+    y_j=rew_t_ph+gamma*(1.0-done_mask_ph)*tf.reduce_max(q_target,axis=1)
+
+    q_phi= tf.reduce_sum(q_current * tf.one_hot(act_t_ph, num_actions), axis=1)
+    total_error=tf.losses.mean_squared_error(q_phi, y_j)
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_current')
     target_q_func_vars=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_target')
@@ -210,28 +210,27 @@ def learn(env,
 
         # YOUR CODE HERE
 
+        if t % 10000==0:
+            print("Iteration: ", t)
+
+
         idx=replay_buffer.store_frame(last_obs)
 
         framed_obs=replay_buffer.encode_recent_observation()
-        ac=session.run(q_current, feed_dict={obs_t_ph:framed_obs}) #here ac includes the q_values of all possible actions in this #!/usr/bin/env python
 
         #determine action based on epsilon greedy exploration given as the argument
-        eps=exploration.value(t)
-        prob=np.rand(1)
-        if prob<eps:
-            action=env.action_space[np.random.randint(0,num_actions)]
+        if not model_initialized or random.random()<exploration.value(t):
+            action=random.randint(0,num_actions-1)
         else:
-            action=env.action_space(np.argmax(ac))
+            action=session.run(greedy_action, feed_dict={obs_t_ph:[framed_obs]}) #here ac includes the q_values of all possible actions in this #!/usr/bin/env python
 
-        last_obs, reward, done, _ = env.step(action)
+
+
+        last_obs, reward, done, _ = env.step(int(action))
         replay_buffer.store_effect(idx, action, reward, done)
 
-
-        if done is True:
+        if done:
             last_obs=env.reset()
-
-
-
 
 
 
@@ -275,7 +274,7 @@ def learn(env,
             # obs_tp1_ph
             # done_mask_ph
             # (this is needed for computing total_error)
-            # learning_rate -- you can get this from optimizer_spec.lr_schedule.value(t)
+            #  learning_rate -- you can get this from optimizer_spec.lr_schedule.value(t)
             # (this is needed by the optimizer to choose the learning rate)
             # 3.d: periodically update the target network by calling
             # session.run(update_target_fn)
@@ -285,10 +284,10 @@ def learn(env,
 
             obs_t_batch, act_batch, rew_batch, obs_tp1_batch, done_mask_batch=replay_buffer.sample(batch_size)
             if not model_initialized:
-                initialize_interdependent_variables(session, tf.global_variables(), {obs_t_ph: obs_t_batch,obs_tp1_ph: obs_tp1_batch,})
+                initialize_interdependent_variables(session, tf.global_variables(), {obs_t_ph: obs_t_batch,obs_tp1_ph: obs_tp1_batch})
                 model_initialized=True
 
-            session.run(train_fn, feed_dict={obs_t_ph:obs_t_batch, act_t_ph:act_batch, rew_batch: rew_batch, obs_tp1_ph: obs_tp1_batch, done_mask_ph: done_mask_ph,learning_rate: optimizer_spec.lr_schedule.value(t)})
+            session.run(train_fn, feed_dict={obs_t_ph:obs_t_batch, act_t_ph:act_batch, rew_t_ph: rew_batch, obs_tp1_ph: obs_tp1_batch, done_mask_ph: done_mask_batch, learning_rate: optimizer_spec.lr_schedule.value(t)})
 
             num_param_updates+=1
 

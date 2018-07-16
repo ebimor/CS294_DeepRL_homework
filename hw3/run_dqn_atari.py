@@ -118,14 +118,28 @@ def get_env(task, seed):
 
 def main():
     # Get Atari games.
-    benchmark = gym.benchmark_spec('Atari40M')
+    #benchmark = gym.benchmark_spec('Atari40M')
 
     # Change the index to select a different game.
-    task = benchmark.tasks[3]
+    #task = benchmark.tasks[3]
+
+    env_id='Pong-v0'
 
     # Run training
     seed = 0 # Use a seed of zero (you may want to randomize the seed!)
-    env = get_env(task, seed)
+    #env = get_env(task, seed)
+
+    max_timesteps = 100000
+    print('task: ', env_id, 'max steps: ', max_timesteps)
+    env = gym.make(env_id)
+
+    set_global_seeds(seed)
+    env.seed(seed)
+
+    expt_dir = '/tmp/hw3_vid_dir2/'
+    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+    env = wrap_deepmind(env)
+
     session = get_session()
     atari_learn(env, session, num_timesteps=task.max_timesteps)
 
