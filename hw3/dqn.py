@@ -130,7 +130,7 @@ def learn(env,
     # YOUR CODE HERE
 
     q_current=q_func(obs_t_float, num_actions, scope="q_current", reuse=False)
-    greedy_action=tf.reduce_max(q_current,axis=1)
+    greedy_action=tf.argmax(q_current,axis=1)
 
     q_target=q_func(obs_tp1_float, num_actions, scope="q_target", reuse=False)
 
@@ -226,11 +226,13 @@ def learn(env,
 
 
 
-        last_obs, reward, done, _ = env.step(int(action))
+        next_obs, reward, done, _ = env.step(action)
         replay_buffer.store_effect(idx, action, reward, done)
 
         if done:
             last_obs=env.reset()
+
+        last_obs=next_obs
 
 
 
