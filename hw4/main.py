@@ -169,7 +169,7 @@ def train(env,
     random_controller = RandomController(env)
 
     """ YOUR CODE HERE """
-
+    paths = sample(env, random_controller, num_paths_random, env_horizon)
 
     #========================================================
     #
@@ -179,8 +179,7 @@ def train(env,
     # for normalizing inputs and denormalizing outputs
     # from the dynamics network.
     #
-    normalization = """ YOUR CODE HERE """
-
+    normalization = compute_normalization(paths)
 
     #========================================================
     #
