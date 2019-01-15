@@ -1,3 +1,4 @@
+
 import numpy as np
 import tensorflow as tf
 import gym
@@ -10,20 +11,49 @@ import os
 import copy
 import matplotlib.pyplot as plt
 from cheetah_env import HalfCheetahEnvNew
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from time import gmtime, strftime
 
-def sample(env, 
-           controller, 
-           num_paths=10, 
-           horizon=1000, 
+def sample(env,
+           controller,
+           num_paths=10,
+           horizon=1000,
            render=False,
            verbose=False):
     """
-        Write a sampler function which takes in an environment, a controller (either random or the MPC controller), 
-        and returns rollouts by running on the env. 
+        Write a sampler function which takes in an environment, a controller (either random or the MPC controller),
+        and returns rollouts by running on the env.
         Each path can have elements for observations, next_observations, rewards, returns, actions, etc.
     """
     paths = []
     """ YOUR CODE HERE """
+    if verbose:
+        iterator = tqdm(iterator)
+
+    for it in range(num_paths):
+        path = []
+        ob = env.reset()
+        if render:
+            env.render()
+        iteration = 0
+        obs, next_obs, rewards, actions = [], [], [], []
+        while true:
+            action = controller.get_action(ob)
+            next_ob, reward, done, _ = env.step(action)
+            iteration +=1
+            if iteration > horizon or done:
+                break
+            obs.append(ob)
+            next_obs.append(next_ob)
+            rewards.append(reward)
+            actions.append(action)
+            ob = next_ob
+        paths.append({'observations':np.array(obs),
+            'next_observations':np.array(next_obs),
+            'rewards':np.array(rewards),
+            'actions':np.array(actions)})
+
 
     return paths
 
@@ -38,17 +68,44 @@ def compute_normalization(data):
     """
 
     """ YOUR CODE HERE """
+    observations = np.concatenate([X['observations'] for X in data])
+    next_observations = np.concatenate([X['next_observations'] for X in data])
+    actions = np.concatenate([X['actions'] for X in data])
+
+    mean_obs = np.mean(observations)
+    std_obs = np.std(observations)
+    mean_deltas = np.mean(next_observations - observations)
+    std_deltas = np.std(next_observations - observations)
+    mean_action = np.mean(actions)
+    std_action = np.std(actions)
+
     return mean_obs, std_obs, mean_deltas, std_deltas, mean_action, std_action
 
 
 def plot_comparison(env, dyn_model):
     """
-    Write a function to generate plots comparing the behavior of the model predictions for each element of the state to the actual ground truth, using randomly sampled actions. 
+    Write a function to generate plots comparing the behavior of the model predictions for each element of the state to the actual ground truth, using randomly sampled actions.
     """
     """ YOUR CODE HERE """
-    pass
 
-def train(env, 
+    real_obs, pred_obs = [], []
+    ob = env.reset()
+    i = 0
+    while True:
+        action = env.action_space.sample()
+        pred_ob = dyn_model.predict(ob, action)
+        real_ob, _, done, _ = env.step(action)
+        real_obs.append(real_ob)
+        pred_obs.append(pred_ob)
+        i += 1
+        if done:
+            break
+    abs_diff = np.abs(np.array(real_obs - pred_obs))
+    plt.plot(np.arange(i), abs_diff)
+    time_str = strftime("%Y-%m-%d_%H:%M:%S", gmtime())
+    plt.savefig("figures/" + time_str + ".png")
+
+def train(env,
          cost_fn,
          logdir=None,
          render=False,
@@ -56,10 +113,10 @@ def train(env,
          onpol_iters=10,
          dynamics_iters=60,
          batch_size=512,
-         num_paths_random=10, 
-         num_paths_onpol=10, 
+         num_paths_random=10,
+         num_paths_onpol=10,
          num_simulated_paths=10000,
-         env_horizon=1000, 
+         env_horizon=1000,
          mpc_horizon=15,
          n_layers=2,
          size=500,
@@ -71,17 +128,17 @@ def train(env,
 
     Arguments:
 
-    onpol_iters                 Number of iterations of onpolicy aggregation for the loop to run. 
+    onpol_iters                 Number of iterations of onpolicy aggregation for the loop to run.
 
     dynamics_iters              Number of iterations of training for the dynamics model
     |_                          which happen per iteration of the aggregation loop.
 
     batch_size                  Batch size for dynamics training.
 
-    num_paths_random            Number of paths/trajectories/rollouts generated 
-    |                           by a random agent. We use these to train our 
+    num_paths_random            Number of paths/trajectories/rollouts generated
+    |                           by a random agent. We use these to train our
     |_                          initial dynamics model.
-    
+
     num_paths_onpol             Number of paths to collect at each iteration of
     |_                          aggregation, using the Model Predictive Control policy.
 
@@ -91,20 +148,20 @@ def train(env,
 
     env_horizon                 Number of timesteps in each path.
 
-    mpc_horizon                 The MPC policy generates actions by imagining 
+    mpc_horizon                 The MPC policy generates actions by imagining
     |                           fictitious rollouts, and picking the first action
     |                           of the best fictitious rollout. This argument is
     |                           how many timesteps should be in each fictitious
     |_                          rollout.
 
-    n_layers/size/activations   Neural network architecture arguments. 
+    n_layers/size/activations   Neural network architecture arguments.
 
     """
 
     logz.configure_output_dir(logdir)
 
     #========================================================
-    # 
+    #
     # First, we need a lot of data generated by a random
     # agent, with which we'll begin to train our dynamics
     # model.
@@ -115,52 +172,52 @@ def train(env,
 
 
     #========================================================
-    # 
+    #
     # The random data will be used to get statistics (mean
     # and std) for the observations, actions, and deltas
     # (where deltas are o_{t+1} - o_t). These will be used
     # for normalizing inputs and denormalizing outputs
-    # from the dynamics network. 
-    # 
+    # from the dynamics network.
+    #
     normalization = """ YOUR CODE HERE """
 
 
     #========================================================
-    # 
+    #
     # Build dynamics model and MPC controllers.
-    # 
+    #
     sess = tf.Session()
 
-    dyn_model = NNDynamicsModel(env=env, 
-                                n_layers=n_layers, 
-                                size=size, 
-                                activation=activation, 
-                                output_activation=output_activation, 
+    dyn_model = NNDynamicsModel(env=env,
+                                n_layers=n_layers,
+                                size=size,
+                                activation=activation,
+                                output_activation=output_activation,
                                 normalization=normalization,
                                 batch_size=batch_size,
                                 iterations=dynamics_iters,
                                 learning_rate=learning_rate,
                                 sess=sess)
 
-    mpc_controller = MPCcontroller(env=env, 
-                                   dyn_model=dyn_model, 
-                                   horizon=mpc_horizon, 
-                                   cost_fn=cost_fn, 
+    mpc_controller = MPCcontroller(env=env,
+                                   dyn_model=dyn_model,
+                                   horizon=mpc_horizon,
+                                   cost_fn=cost_fn,
                                    num_simulated_paths=num_simulated_paths)
 
 
     #========================================================
-    # 
+    #
     # Tensorflow session building.
-    # 
+    #
     sess.__enter__()
     tf.global_variables_initializer().run()
 
     #========================================================
-    # 
-    # Take multiple iterations of onpolicy aggregation at each iteration refitting the dynamics model to current dataset and then taking onpolicy samples and aggregating to the dataset. 
+    #
+    # Take multiple iterations of onpolicy aggregation at each iteration refitting the dynamics model to current dataset and then taking onpolicy samples and aggregating to the dataset.
     # Note: You don't need to use a mixing ratio in this assignment for new and old data as described in https://arxiv.org/abs/1708.02596
-    # 
+    #
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
 
@@ -225,7 +282,7 @@ def main():
     if args.env_name is "HalfCheetah-v1":
         env = HalfCheetahEnvNew()
         cost_fn = cheetah_cost_fn
-    train(env=env, 
+    train(env=env,
                  cost_fn=cost_fn,
                  logdir=logdir,
                  render=args.render,
@@ -233,10 +290,10 @@ def main():
                  onpol_iters=args.onpol_iters,
                  dynamics_iters=args.dyn_iters,
                  batch_size=args.batch_size,
-                 num_paths_random=args.random_paths, 
-                 num_paths_onpol=args.onpol_paths, 
+                 num_paths_random=args.random_paths,
+                 num_paths_onpol=args.onpol_paths,
                  num_simulated_paths=args.simulated_paths,
-                 env_horizon=args.ep_len, 
+                 env_horizon=args.ep_len,
                  mpc_horizon=args.mpc_horizon,
                  n_layers = args.n_layers,
                  size=args.size,
