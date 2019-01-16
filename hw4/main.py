@@ -219,8 +219,12 @@ def train(env,
     #
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
+        dyn_model.fit(paths)
+        on_policy_paths = sample(env, mpc_controller, num_paths_onpol, env_horizon)
+        paths = np.concatenate(paths, on_policy_paths)
 
-
+        returns = [np.sum(path['rewards']) for path in paths]
+        costs = [trajectory_cost_fn(cost_fn, path['observations'], path['actions'], path['next_observations']) for path in paths]
 
         # LOGGING
         # Statistics for performance of MPC policy using
