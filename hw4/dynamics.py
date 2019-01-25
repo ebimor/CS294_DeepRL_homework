@@ -34,7 +34,7 @@ class NNDynamicsModel():
         """ Note: Be careful about normalization """
 
         ob_dim = env.observation_space.shape[0]
-        ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
+        ac_dim = env.action_space.shape[0]
         self.st_at = tf.placeholder(shape=[None, ob_dim+ac_dim], name="input", dtype=tf.float32)
         self.delta = tf.placeholder(shape=[None, ob_dim], name="state", dtype=tf.float32)
         self.f_theta = build_mlp(self.st_at, ob_dim, "dynamics", n_layers, size, activation, output_activation)

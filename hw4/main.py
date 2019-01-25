@@ -214,17 +214,18 @@ def train(env,
 
     #========================================================
     #
-    # Take multiple iterations of onpolicy aggregation at each iteration refitting the dynamics model to current dataset and then taking onpolicy samples and aggregating to the dataset.
+    # Take multiple iterations of onpolicy aggregation at each iteration refitting the dynamics model to current dataset and then taking onpolicy samples and
+    # aggregating to the dataset.
     # Note: You don't need to use a mixing ratio in this assignment for new and old data as described in https://arxiv.org/abs/1708.02596
     #
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
         dyn_model.fit(paths)
-        on_policy_paths = sample(env, mpc_controller, num_paths_onpol, env_horizon)
+        on_policy_paths = sample(env, mpc_controller, num_paths_onpol, env_horizon) # this is equivalent to the second loop (for t=1 to T ...)
         paths = np.concatenate(paths, on_policy_paths)
 
         returns = [np.sum(path['rewards']) for path in paths]
-        costs = [trajectory_cost_fn(cost_fn, path['observations'], path['actions'], path['next_observations']) for path in paths]
+        costs = [path_cost(cost_fn, path) for path in paths]
 
         # LOGGING
         # Statistics for performance of MPC policy using
