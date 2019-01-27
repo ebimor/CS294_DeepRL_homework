@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import math
 
 # Predefined function to build a feedforward neural network
 def build_mlp(input_placeholder,
@@ -56,7 +57,7 @@ class NNDynamicsModel():
         """YOUR CODE HERE """
         states = np.concatenate([d['observations'] for d in data])
         actions = np.concatenate([d['actions'] for d in data])
-        next_states = np.concatenate(d['next_observations'] for d in data)
+        next_states = np.concatenate([d['next_observations'] for d in data])
 
         epsilon = 1e-6
 
@@ -68,9 +69,12 @@ class NNDynamicsModel():
 
         st_at_normalized = np.concatenate((normalized_states, normalized_actions), axis=1)
 
+        N = states.shape[0]
+        indices = np.arange(N)
+
         for _ in range(self.iter):
             np.random.shuffle(indices)
-            batches = int (math.ceil(normalized_state.shape[0] / self.batch_size))
+            batches = int (math.ceil(normalized_states.shape[0] / self.batch_size))
             for i in range(batches):
                 start_idx = i * self.batch_size
                 idxs = indices[start_idx : start_idx + self.batch_size]

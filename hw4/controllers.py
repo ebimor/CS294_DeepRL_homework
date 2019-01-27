@@ -43,9 +43,9 @@ class MPCcontroller(Controller):
 		""" Note: be careful to batch your simulations through the model for speed """
 
 		states, next_states, inputs = [], [], []
-		observations = [state for _ in range(self.num_simulated_paths)]
+		observations = [state for _ in range(self.num_simulated_paths)] #augment the input state to simulate the paths that start at "state"
 
-	    for it in range(self.horizon):
+		for it in range(self.horizon):
 			actions =  [self.env.action_space.sample() for _ in range(self.num_simulated_paths)]
 			next_observations = self.dyn_model.predict(observations, actions)
 			states.append(observations)
@@ -53,6 +53,7 @@ class MPCcontroller(Controller):
 			inputs.append(actions)
 			observations = next_observations
 
-		costs = trajectory_cost_fn(self.cost_fn, states, inputs, next_states)
-		best_action_index = np.argmin(costs)
-		return inputs[costs,0]
+		costs = trajectory_cost_fn(self.cost_fn, np.array(states), np.array(inputs), np.array(next_states))
+		#print(costs)
+		best_action_index = np.argmin(np.array(costs))
+		return inputs[0][best_action_index]

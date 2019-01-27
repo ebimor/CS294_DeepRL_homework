@@ -38,7 +38,7 @@ def sample(env,
             env.render()
         iteration = 0
         obs, next_obs, rewards, actions = [], [], [], []
-        while true:
+        while True:
             action = controller.get_action(ob)
             next_ob, reward, done, _ = env.step(action)
             iteration +=1
