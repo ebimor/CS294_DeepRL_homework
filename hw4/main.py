@@ -169,7 +169,7 @@ def train(env,
     random_controller = RandomController(env)
 
     """ YOUR CODE HERE """
-    paths = sample(env, random_controller, num_paths_random, env_horizon)
+    paths = sample(env, random_controller, num_paths_random, env_horizon, render)
 
     #========================================================
     #
@@ -222,11 +222,10 @@ def train(env,
         """ YOUR CODE HERE """
         dyn_model.fit(paths)
         on_policy_paths = sample(env, mpc_controller, num_paths_onpol, env_horizon) # this is equivalent to the second loop (for t=1 to T ...)
-        paths = np.concatenate(paths, on_policy_paths)
+        paths = np.concatenate([paths, on_policy_paths])
 
         returns = [np.sum(path['rewards']) for path in paths]
         costs = [path_cost(cost_fn, path) for path in paths]
-
         # LOGGING
         # Statistics for performance of MPC policy using
         # our learned dynamics model
@@ -243,7 +242,8 @@ def train(env,
         logz.log_tabular('MaximumReturn', np.max(returns))
 
         logz.dump_tabular()
-
+    print("Ffffffffffffffinished")
+    on_policy_paths = sample(env, mpc_controller, num_paths_onpol, 2, render=True) # this is equivalent to the second loop (for t=1 to T ...)
 def main():
 
     import argparse
@@ -259,15 +259,15 @@ def main():
     parser.add_argument('--dyn_iters', '-nd', type=int, default=60)
     parser.add_argument('--batch_size', '-b', type=int, default=512)
     # Data collection
-    parser.add_argument('--random_paths', '-r', type=int, default=10)
+    parser.add_argument('--random_paths', '-r', type=int, default=400)
     parser.add_argument('--onpol_paths', '-d', type=int, default=10)
-    parser.add_argument('--simulated_paths', '-sp', type=int, default=1000)
-    parser.add_argument('--ep_len', '-ep', type=int, default=1000)
+    parser.add_argument('--ep_len', '-ep', type=int, default=60)
     # Neural network architecture args
     parser.add_argument('--n_layers', '-l', type=int, default=2)
-    parser.add_argument('--size', '-s', type=int, default=500)
+    parser.add_argument('--size', '-s', type=int, default=200)
     # MPC Controller
-    parser.add_argument('--mpc_horizon', '-m', type=int, default=15)
+    parser.add_argument('--mpc_horizon', '-m', type=int, default=5)
+    parser.add_argument('--simulated_paths', '-sp', type=int, default=3000)
     args = parser.parse_args()
 
     # Set seed
