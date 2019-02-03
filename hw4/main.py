@@ -14,6 +14,7 @@ from cheetah_env import HalfCheetahEnvNew
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from time import gmtime, strftime
+from numpy import linalg as LA
 
 def sample(env,
            controller,
@@ -93,15 +94,23 @@ def plot_comparison(env, dyn_model):
     i = 0
     while True:
         action = env.action_space.sample()
-        pred_ob = dyn_model.predict(ob, action)
+        pred_ob = dyn_model.predict(np.reshape(ob, (1,env.observation_space.shape[0])), np.reshape(action, (1,env.action_space.shape[0])))
         real_ob, _, done, _ = env.step(action)
         real_obs.append(real_ob)
         pred_obs.append(pred_ob)
         i += 1
-        if done:
+        if done or i>2000:
             break
-    abs_diff = np.abs(np.array(real_obs - pred_obs))
-    plt.plot(np.arange(i), abs_diff)
+
+    Y=np.empty([20,1])
+    for a_i, b_i in zip(real_obs, pred_obs):
+    	abs_diff = np.array([a_i - b_i ])
+    	Y = np.append(Y, np.reshape(abs_diff, (20,1)), axis=1)
+
+    print(Y.shape)
+    plt.plot(np.arange(i+1), LA.norm(Y, axis=0))
+    print("HERE")
+    plt.show()
     time_str = strftime("%Y-%m-%d_%H:%M:%S", gmtime())
     plt.savefig("figures/" + time_str + ".png")
 
@@ -218,6 +227,9 @@ def train(env,
     # aggregating to the dataset.
     # Note: You don't need to use a mixing ratio in this assignment for new and old data as described in https://arxiv.org/abs/1708.02596
     #
+
+    plot_comparison(env, dyn_model)
+'''
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
         dyn_model.fit(paths)
@@ -242,8 +254,11 @@ def train(env,
         logz.log_tabular('MaximumReturn', np.max(returns))
 
         logz.dump_tabular()
+        plot_comparison(env, dyn_model)
     print("Ffffffffffffffinished")
-    on_policy_paths = sample(env, mpc_controller, num_paths_onpol, 2, render=True) # this is equivalent to the second loop (for t=1 to T ...)
+    #on_policy_paths = sample(env, mpc_controller, num_paths_onpol, 2, render=True) # this is equivalent to the second loop (for t=1 to T ...)
+'''
+
 def main():
 
     import argparse
@@ -255,19 +270,19 @@ def main():
     parser.add_argument('--render', action='store_true')
     # Training args
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
-    parser.add_argument('--onpol_iters', '-n', type=int, default=1)
+    parser.add_argument('--onpol_iters', '-n', type=int, default=2)
     parser.add_argument('--dyn_iters', '-nd', type=int, default=60)
     parser.add_argument('--batch_size', '-b', type=int, default=512)
     # Data collection
-    parser.add_argument('--random_paths', '-r', type=int, default=400)
+    parser.add_argument('--random_paths', '-r', type=int, default=10000)
     parser.add_argument('--onpol_paths', '-d', type=int, default=10)
     parser.add_argument('--ep_len', '-ep', type=int, default=60)
     # Neural network architecture args
     parser.add_argument('--n_layers', '-l', type=int, default=2)
     parser.add_argument('--size', '-s', type=int, default=200)
     # MPC Controller
-    parser.add_argument('--mpc_horizon', '-m', type=int, default=5)
-    parser.add_argument('--simulated_paths', '-sp', type=int, default=3000)
+    parser.add_argument('--mpc_horizon', '-m', type=int, default=4)
+    parser.add_argument('--simulated_paths', '-sp', type=int, default=5000)
     args = parser.parse_args()
 
     # Set seed

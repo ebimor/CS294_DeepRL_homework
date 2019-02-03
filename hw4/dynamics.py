@@ -61,6 +61,8 @@ class NNDynamicsModel():
 
         epsilon = 1e-6
 
+        #print(normalized_states.shape)
+
         normalized_states = (states - self.mu_s)/(self.sigma_s+epsilon)
         normalized_next_states =  (next_states - self.mu_s)/(self.sigma_s+epsilon)
         normalized_actions =  (actions - self.mu_a)/(self.sigma_a+epsilon)
@@ -73,6 +75,7 @@ class NNDynamicsModel():
         indices = np.arange(N)
 
         for _ in range(self.iter):
+            print ("iteration number %d", _)
             np.random.shuffle(indices)
             batches = int (math.ceil(normalized_states.shape[0] / self.batch_size))
             for i in range(batches):
@@ -90,6 +93,9 @@ class NNDynamicsModel():
 
         normalized_states = (states - self.mu_s)/(self.sigma_s+epsilon)
         normalized_actions =  (actions - self.mu_a)/(self.sigma_a+epsilon)
+
+        #print(normalized_states.shape)
+        #print(normalized_actions.shape)
 
         st_at_normalized = np.concatenate((normalized_states, normalized_actions), axis=1)
 
