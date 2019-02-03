@@ -16,10 +16,10 @@ import matplotlib.pyplot as plt
 from time import gmtime, strftime
 from numpy import linalg as LA
 
-def sample(env,
-           controller,
-           num_paths=10,
-           horizon=1000,
+def sample(env, 
+           controller, 
+           num_paths=10, 
+           horizon=1000, 
            render=False,
            verbose=False):
     """
@@ -42,19 +42,18 @@ def sample(env,
         while True:
             action = controller.get_action(ob)
             next_ob, reward, done, _ = env.step(action)
-            iteration +=1
-            if iteration > horizon or done:
-                break
+            iteration += 1
             obs.append(ob)
             next_obs.append(next_ob)
             rewards.append(reward)
             actions.append(action)
             ob = next_ob
+            if iteration > horizon or done:
+                break
         paths.append({'observations':np.array(obs),
             'next_observations':np.array(next_obs),
             'rewards':np.array(rewards),
             'actions':np.array(actions)})
-
 
     return paths
 
@@ -72,6 +71,8 @@ def compute_normalization(data):
     observations = np.concatenate([X['observations'] for X in data])
     next_observations = np.concatenate([X['next_observations'] for X in data])
     actions = np.concatenate([X['actions'] for X in data])
+
+    print("size of observations data is: ", observations.shape)
 
     mean_obs = np.mean(observations)
     std_obs = np.std(observations)
@@ -109,12 +110,11 @@ def plot_comparison(env, dyn_model):
 
     print(Y.shape)
     plt.plot(np.arange(i+1), LA.norm(Y, axis=0))
-    print("HERE")
     plt.show()
     time_str = strftime("%Y-%m-%d_%H:%M:%S", gmtime())
     plt.savefig("figures/" + time_str + ".png")
 
-def train(env,
+def train(env, 
          cost_fn,
          logdir=None,
          render=False,
@@ -122,10 +122,10 @@ def train(env,
          onpol_iters=10,
          dynamics_iters=60,
          batch_size=512,
-         num_paths_random=10,
-         num_paths_onpol=10,
+         num_paths_random=10, 
+         num_paths_onpol=10, 
          num_simulated_paths=10000,
-         env_horizon=1000,
+         env_horizon=1000, 
          mpc_horizon=15,
          n_layers=2,
          size=500,
@@ -227,37 +227,42 @@ def train(env,
     # aggregating to the dataset.
     # Note: You don't need to use a mixing ratio in this assignment for new and old data as described in https://arxiv.org/abs/1708.02596
     #
+    dyn_model.fit(paths)
 
-    plot_comparison(env, dyn_model)
-'''
+    #plot_comparison(env, dyn_model)
+
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
-        dyn_model.fit(paths)
         on_policy_paths = sample(env, mpc_controller, num_paths_onpol, env_horizon) # this is equivalent to the second loop (for t=1 to T ...)
         paths = np.concatenate([paths, on_policy_paths])
-
         returns = [np.sum(path['rewards']) for path in paths]
         costs = [path_cost(cost_fn, path) for path in paths]
+        dyn_model.fit(paths)
         # LOGGING
         # Statistics for performance of MPC policy using
         # our learned dynamics model
+        print("dumping")
         logz.log_tabular('Iteration', itr)
         # In terms of cost function which your MPC controller uses to plan
-        logz.log_tabular('AverageCost', np.mean(costs))
-        logz.log_tabular('StdCost', np.std(costs))
-        logz.log_tabular('MinimumCost', np.min(costs))
-        logz.log_tabular('MaximumCost', np.max(costs))
+        #logz.log_tabular('AverageCost', np.mean(costs))
+        #logz.log_tabular('StdCost', np.std(costs))
+        #logz.log_tabular('MinimumCost', np.min(costs))
+        #logz.log_tabular('MaximumCost', np.max(costs))
         # In terms of true environment reward of your rolled out trajectory using the MPC controller
+        print("dumping")
         logz.log_tabular('AverageReturn', np.mean(returns))
+        print("AverageReturn")
         logz.log_tabular('StdReturn', np.std(returns))
+        print("StdReturn")
         logz.log_tabular('MinimumReturn', np.min(returns))
+        print("MinimumReturn")
         logz.log_tabular('MaximumReturn', np.max(returns))
-
+        print("MaximumReturn")
         logz.dump_tabular()
-        plot_comparison(env, dyn_model)
-    print("Ffffffffffffffinished")
-    #on_policy_paths = sample(env, mpc_controller, num_paths_onpol, 2, render=True) # this is equivalent to the second loop (for t=1 to T ...)
-'''
+        print("dumping")
+        #plot_comparison(env, dyn_model)
+
+
 
 def main():
 
@@ -270,19 +275,19 @@ def main():
     parser.add_argument('--render', action='store_true')
     # Training args
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
-    parser.add_argument('--onpol_iters', '-n', type=int, default=2)
+    parser.add_argument('--onpol_iters', '-n', type=int, default=1)
     parser.add_argument('--dyn_iters', '-nd', type=int, default=60)
     parser.add_argument('--batch_size', '-b', type=int, default=512)
     # Data collection
-    parser.add_argument('--random_paths', '-r', type=int, default=10000)
+    parser.add_argument('--random_paths', '-r', type=int, default=10)
     parser.add_argument('--onpol_paths', '-d', type=int, default=10)
-    parser.add_argument('--ep_len', '-ep', type=int, default=60)
+    parser.add_argument('--simulated_paths', '-sp', type=int, default=1000)
+    parser.add_argument('--ep_len', '-ep', type=int, default=1000)
     # Neural network architecture args
     parser.add_argument('--n_layers', '-l', type=int, default=2)
-    parser.add_argument('--size', '-s', type=int, default=200)
+    parser.add_argument('--size', '-s', type=int, default=500)
     # MPC Controller
-    parser.add_argument('--mpc_horizon', '-m', type=int, default=4)
-    parser.add_argument('--simulated_paths', '-sp', type=int, default=5000)
+    parser.add_argument('--mpc_horizon', '-m', type=int, default=15)
     args = parser.parse_args()
 
     # Set seed

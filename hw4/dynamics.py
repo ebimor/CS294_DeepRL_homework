@@ -3,11 +3,11 @@ import numpy as np
 import math
 
 # Predefined function to build a feedforward neural network
-def build_mlp(input_placeholder,
+def build_mlp(input_placeholder, 
               output_size,
-              scope,
-              n_layers=2,
-              size=500,
+              scope, 
+              n_layers=2, 
+              size=500, 
               activation=tf.tanh,
               output_activation=None
               ):
@@ -40,7 +40,7 @@ class NNDynamicsModel():
         self.delta = tf.placeholder(shape=[None, ob_dim], name="state", dtype=tf.float32)
         self.f_theta = build_mlp(self.st_at, ob_dim, "dynamics", n_layers, size, activation, output_activation)
 
-        self.mu_s, self.sigma_s, self.mu_a, self.sigma_a, self.mu_delta, self.sigma_delta = normalization
+        self.mu_s, self.sigma_s, self.mu_delta, self.sigma_delta, self.mu_a, self.sigma_a = normalization
         self.sess = sess
         self.batch_size = batch_size
         self.iter = iterations
@@ -67,23 +67,23 @@ class NNDynamicsModel():
         normalized_next_states =  (next_states - self.mu_s)/(self.sigma_s+epsilon)
         normalized_actions =  (actions - self.mu_a)/(self.sigma_a+epsilon)
 
-        normalized_deltas = normalized_next_states - normalized_states
+        normalized_deltas = ((next_states - states)-self.mu_delta)/(self.mu_delta+epsilon) #normalized_next_states - normalized_states
 
         st_at_normalized = np.concatenate((normalized_states, normalized_actions), axis=1)
-
-        N = states.shape[0]
-        indices = np.arange(N)
+ 
+        indices = np.arange(states.shape[0])
 
         for _ in range(self.iter):
-            print ("iteration number %d", _)
+            print ("iteration number is: ", _)
             np.random.shuffle(indices)
-            batches = int (math.ceil(normalized_states.shape[0] / self.batch_size))
+            batches = int (math.ceil(states.shape[0] / self.batch_size))
             for i in range(batches):
                 start_idx = i * self.batch_size
                 idxs = indices[start_idx : start_idx + self.batch_size]
                 batch_st_at = st_at_normalized[idxs, :]
                 batch_delta = normalized_deltas[idxs, :]
-                self.sess.run(self.trainer, feed_dict={self.st_at : batch_st_at, self.delta: batch_delta})
+                x, loss_val = self.sess.run([self.trainer, self.loss], feed_dict={self.st_at : batch_st_at, self.delta: batch_delta})
+            print("loss_val is: ", loss_val)
 
 
     def predict(self, states, actions):
